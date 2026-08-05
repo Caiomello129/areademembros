@@ -52,7 +52,14 @@ function normalizePaymentMethod(method?: string) {
   const value = method?.toLowerCase() ?? "";
 
   if (value.includes("pix")) return "pix";
-  if (value.includes("card") || value.includes("credit")) return "card";
+
+  if (
+    value.includes("card") ||
+    value.includes("credit")
+  ) {
+    return "card";
+  }
+
   if (value.includes("boleto")) return "boleto";
 
   return "other";
@@ -66,11 +73,18 @@ function normalizeItemType(type?: string) {
     "downsell",
   ];
 
-  return acceptedTypes.includes(type ?? "") ? type : "other";
+  return acceptedTypes.includes(type ?? "")
+    ? type
+    : "other";
 }
 
-function getPayloadProducts(payload: GGCheckoutPayload) {
-  if (payload.products && payload.products.length > 0) {
+function getPayloadProducts(
+  payload: GGCheckoutPayload
+) {
+  if (
+    payload.products &&
+    payload.products.length > 0
+  ) {
     return payload.products;
   }
 
@@ -82,7 +96,9 @@ function getPayloadProducts(payload: GGCheckoutPayload) {
 }
 
 function convertAmountToCents(amount?: number) {
-  if (!amount || amount < 0) return 0;
+  if (!amount || amount < 0) {
+    return 0;
+  }
 
   return Math.round(amount * 100);
 }
@@ -100,48 +116,93 @@ export async function POST(request: Request) {
 
   if (!configuredSecret) {
     return NextResponse.json(
-      { error: "Webhook não configurado no servidor." },
-      { status: 500 }
+      {
+        error:
+          "Webhook não configurado no servidor.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 
-  const receivedSecret = getReceivedSecret(request);
+  const receivedSecret =
+    getReceivedSecret(request);
 
-  if (!receivedSecret || receivedSecret !== configuredSecret) {
+  if (
+    !receivedSecret ||
+    receivedSecret !== configuredSecret
+  ) {
     return NextResponse.json(
-      { error: "Webhook não autorizado." },
-      { status: 401 }
+      {
+        error: "Webhook não autorizado.",
+      },
+      {
+        status: 401,
+      }
     );
   }
 
   let payload: GGCheckoutPayload;
 
   try {
-    payload = (await request.json()) as GGCheckoutPayload;
+    payload =
+      (await request.json()) as GGCheckoutPayload;
   } catch {
+    /*
+     * Algumas plataformas enviam uma requisição
+     * de validação sem JSON completo ao cadastrar
+     * o webhook.
+     */
     return NextResponse.json(
-      { error: "JSON inválido." },
-      { status: 400 }
+      {
+        received: true,
+        validation: true,
+        message: "Endpoint disponível.",
+      },
+      {
+        status: 200,
+      }
     );
   }
 
   const eventType = payload.event;
   const paymentId = payload.payment?.id;
+
   const customerEmail = normalizeEmail(
     payload.customer?.email
   );
 
+  /*
+   * A GG Checkout pode enviar um POST de validação
+   * sem os dados completos de uma compra.
+   *
+   * Nesse caso, respondemos 200 para permitir
+   * que o webhook seja cadastrado.
+   *
+   * Nenhum usuário, compra ou acesso é criado aqui.
+   */
   if (!eventType || !paymentId) {
+    console.log(
+      "Validação do webhook GG Checkout recebida:",
+      payload
+    );
+
     return NextResponse.json(
       {
-        error: "Payload incompleto.",
-        required: ["event", "payment.id"],
+        received: true,
+        validation: true,
+        message: "Endpoint disponível.",
       },
-      { status: 400 }
+      {
+        status: 200,
+      }
     );
   }
 
-  const externalEventId = `${eventType}:${paymentId}`;
+  const externalEventId =
+    `${eventType}:${paymentId}`;
+
   const admin = createAdminClient();
 
   const { data: existingEvent } = await admin
@@ -151,7 +212,9 @@ export async function POST(request: Request) {
     .eq("external_event_id", externalEventId)
     .maybeSingle();
 
-  if (existingEvent?.status === "processed") {
+  if (
+    existingEvent?.status === "processed"
+  ) {
     return NextResponse.json({
       received: true,
       processed: true,
@@ -169,25 +232,28 @@ export async function POST(request: Request) {
       .from("webhook_events")
       .update({
         status: "processing",
-        attempts: existingEvent.attempts + 1,
+        attempts:
+          (existingEvent.attempts ?? 0) + 1,
         error_message: null,
       })
       .eq("id", existingEvent.id);
   } else {
-    const { data: createdEvent, error: eventError } =
-      await admin
-        .from("webhook_events")
-        .insert({
-          provider: "ggcheckout",
-          external_event_id: externalEventId,
-          event_type: eventType,
-          external_payment_id: paymentId,
-          payload,
-          status: "processing",
-          attempts: 1,
-        })
-        .select("id")
-        .single();
+    const {
+      data: createdEvent,
+      error: eventError,
+    } = await admin
+      .from("webhook_events")
+      .insert({
+        provider: "ggcheckout",
+        external_event_id: externalEventId,
+        event_type: eventType,
+        external_payment_id: paymentId,
+        payload,
+        status: "processing",
+        attempts: 1,
+      })
+      .select("id")
+      .single();
 
     if (eventError || !createdEvent) {
       if (eventError?.code === "23505") {
@@ -199,10 +265,13 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         {
-          error: "Não foi possível registrar o webhook.",
+          error:
+            "Não foi possível registrar o webhook.",
           details: eventError?.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+        }
       );
     }
 
@@ -210,12 +279,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const paidEvents = ["pix.paid", "card.paid"];
+    const paidEvents = [
+      "pix.paid",
+      "card.paid",
+    ];
+
     const refundedEvents = [
       "pix.refunded",
       "card.refunded",
     ];
 
+    /*
+     * Eventos que não são pagamento aprovado
+     * nem reembolso são registrados e ignorados.
+     */
     if (
       !paidEvents.includes(eventType) &&
       !refundedEvents.includes(eventType)
@@ -224,7 +301,8 @@ export async function POST(request: Request) {
         .from("webhook_events")
         .update({
           status: "ignored",
-          processed_at: new Date().toISOString(),
+          processed_at:
+            new Date().toISOString(),
         })
         .eq("id", webhookEventId);
 
@@ -236,44 +314,77 @@ export async function POST(request: Request) {
       });
     }
 
-    if (refundedEvents.includes(eventType)) {
-      const { data: purchase, error: purchaseError } =
-        await admin
-          .from("purchases")
-          .select("id")
-          .eq("provider", "ggcheckout")
-          .eq("external_payment_id", paymentId)
-          .maybeSingle();
+    /*
+     * Processamento de reembolso.
+     */
+    if (
+      refundedEvents.includes(eventType)
+    ) {
+      const {
+        data: purchase,
+        error: purchaseError,
+      } = await admin
+        .from("purchases")
+        .select("id")
+        .eq("provider", "ggcheckout")
+        .eq(
+          "external_payment_id",
+          paymentId
+        )
+        .maybeSingle();
 
       if (purchaseError) {
-        throw new Error(purchaseError.message);
+        throw new Error(
+          purchaseError.message
+        );
       }
 
       if (purchase) {
-        await admin
+        const now =
+          new Date().toISOString();
+
+        const {
+          error: refundPurchaseError,
+        } = await admin
           .from("purchases")
           .update({
             status: "refunded",
-            refunded_at: new Date().toISOString(),
+            refunded_at: now,
             raw_payload: payload,
           })
           .eq("id", purchase.id);
 
-        await admin
+        if (refundPurchaseError) {
+          throw new Error(
+            refundPurchaseError.message
+          );
+        }
+
+        const {
+          error: revokeAccessError,
+        } = await admin
           .from("user_product_access")
           .update({
             status: "revoked",
-            revoked_at: new Date().toISOString(),
+            revoked_at: now,
           })
           .eq("purchase_id", purchase.id)
           .eq("status", "active");
+
+        if (revokeAccessError) {
+          throw new Error(
+            revokeAccessError.message
+          );
+        }
       }
 
       await admin
         .from("webhook_events")
         .update({
           status: "processed",
-          processed_at: new Date().toISOString(),
+          processed_at:
+            new Date().toISOString(),
+          error_message: null,
         })
         .eq("id", webhookEventId);
 
@@ -285,13 +396,17 @@ export async function POST(request: Request) {
       });
     }
 
+    /*
+     * Processamento de pagamento aprovado.
+     */
     if (!customerEmail) {
       throw new Error(
         "O cliente não possui e-mail no payload."
       );
     }
 
-    const payloadProducts = getPayloadProducts(payload);
+    const payloadProducts =
+      getPayloadProducts(payload);
 
     if (payloadProducts.length === 0) {
       throw new Error(
@@ -299,35 +414,53 @@ export async function POST(request: Request) {
       );
     }
 
-    let { data: profile, error: profileError } =
-      await admin
-        .from("profiles")
-        .select("id, email")
-        .ilike("email", customerEmail)
-        .maybeSingle();
+    /*
+     * Procura o perfil pelo e-mail.
+     */
+    let {
+      data: profile,
+      error: profileError,
+    } = await admin
+      .from("profiles")
+      .select("id, email")
+      .ilike("email", customerEmail)
+      .maybeSingle();
 
     if (profileError) {
-      throw new Error(profileError.message);
+      throw new Error(
+        profileError.message
+      );
     }
 
+    /*
+     * Se o usuário ainda não existir,
+     * cria no Supabase Auth.
+     */
     if (!profile) {
       const temporaryPassword =
-        randomBytes(24).toString("hex") + "A1!";
+        randomBytes(24).toString("hex") +
+        "A1!";
 
       const {
         data: createdUser,
         error: createUserError,
-      } = await admin.auth.admin.createUser({
-        email: customerEmail,
-        password: temporaryPassword,
-        email_confirm: true,
-        user_metadata: {
-          full_name: payload.customer?.name ?? null,
-          phone: payload.customer?.phone ?? null,
-        },
-      });
+      } =
+        await admin.auth.admin.createUser({
+          email: customerEmail,
+          password: temporaryPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name:
+              payload.customer?.name ?? null,
+            phone:
+              payload.customer?.phone ?? null,
+          },
+        });
 
-      if (createUserError || !createdUser.user) {
+      if (
+        createUserError ||
+        !createdUser.user
+      ) {
         throw new Error(
           createUserError?.message ??
             "Não foi possível criar o usuário."
@@ -342,14 +475,19 @@ export async function POST(request: Request) {
         .upsert({
           id: createdUser.user.id,
           email: customerEmail,
-          full_name: payload.customer?.name ?? null,
-          phone: payload.customer?.phone ?? null,
+          full_name:
+            payload.customer?.name ?? null,
+          phone:
+            payload.customer?.phone ?? null,
           role: "customer",
         })
         .select("id, email")
         .single();
 
-      if (createdProfileError || !createdProfile) {
+      if (
+        createdProfileError ||
+        !createdProfile
+      ) {
         throw new Error(
           createdProfileError?.message ??
             "Não foi possível criar o perfil."
@@ -359,41 +497,54 @@ export async function POST(request: Request) {
       profile = createdProfile;
     }
 
-    const { data: purchase, error: purchaseError } =
-      await admin
-        .from("purchases")
-        .upsert(
-          {
-            user_id: profile.id,
-            provider: "ggcheckout",
-            external_payment_id: paymentId,
-            customer_email: customerEmail,
-            customer_name:
-              payload.customer?.name ?? null,
-            customer_phone:
-              payload.customer?.phone ?? null,
-            payment_method: normalizePaymentMethod(
-              payload.payment?.paymentMethod ??
+    /*
+     * Cria ou atualiza a compra.
+     */
+    const {
+      data: purchase,
+      error: purchaseError,
+    } = await admin
+      .from("purchases")
+      .upsert(
+        {
+          user_id: profile.id,
+          provider: "ggcheckout",
+          external_payment_id:
+            paymentId,
+          customer_email:
+            customerEmail,
+          customer_name:
+            payload.customer?.name ?? null,
+          customer_phone:
+            payload.customer?.phone ?? null,
+          payment_method:
+            normalizePaymentMethod(
+              payload.payment
+                ?.paymentMethod ??
                 payload.payment?.method
             ),
-            amount_cents: convertAmountToCents(
+          amount_cents:
+            convertAmountToCents(
               payload.payment?.amount
             ),
-            status: "paid",
-            paid_at:
-              payload.createdAt ??
-              new Date().toISOString(),
-            raw_payload: payload,
-          },
-          {
-            onConflict:
-              "provider,external_payment_id",
-          }
-        )
-        .select("id")
-        .single();
+          status: "paid",
+          paid_at:
+            payload.createdAt ??
+            new Date().toISOString(),
+          raw_payload: payload,
+        },
+        {
+          onConflict:
+            "provider,external_payment_id",
+        }
+      )
+      .select("id")
+      .single();
 
-    if (purchaseError || !purchase) {
+    if (
+      purchaseError ||
+      !purchase
+    ) {
       throw new Error(
         purchaseError?.message ??
           "Não foi possível registrar a compra."
@@ -402,7 +553,13 @@ export async function POST(request: Request) {
 
     const releasedProducts: string[] = [];
 
-    for (const payloadProduct of payloadProducts) {
+    /*
+     * Processa produto principal, order bump,
+     * upsell e downsell.
+     */
+    for (
+      const payloadProduct of payloadProducts
+    ) {
       if (!payloadProduct.id) {
         throw new Error(
           "Um dos produtos não possui ID na GG Checkout."
@@ -414,7 +571,9 @@ export async function POST(request: Request) {
         error: productError,
       } = await admin
         .from("products")
-        .select("id, title, ggcheckout_product_id")
+        .select(
+          "id, title, ggcheckout_product_id"
+        )
         .eq(
           "ggcheckout_product_id",
           payloadProduct.id
@@ -423,7 +582,9 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (productError) {
-        throw new Error(productError.message);
+        throw new Error(
+          productError.message
+        );
       }
 
       if (!internalProduct) {
@@ -432,6 +593,9 @@ export async function POST(request: Request) {
         );
       }
 
+      /*
+       * Registra o item da compra.
+       */
       const {
         data: purchaseItem,
         error: itemError,
@@ -440,18 +604,23 @@ export async function POST(request: Request) {
         .upsert(
           {
             purchase_id: purchase.id,
-            product_id: internalProduct.id,
+            product_id:
+              internalProduct.id,
             external_product_id:
               payloadProduct.id,
             title:
               payloadProduct.title ??
               internalProduct.title,
-            item_type: normalizeItemType(
-              payloadProduct.type
-            ),
+            item_type:
+              normalizeItemType(
+                payloadProduct.type
+              ),
             price_cents:
-              payloadProduct.price !== undefined
-                ? Math.round(payloadProduct.price)
+              payloadProduct.price !==
+              undefined
+                ? Math.round(
+                    payloadProduct.price
+                  )
                 : null,
           },
           {
@@ -462,33 +631,46 @@ export async function POST(request: Request) {
         .select("id")
         .single();
 
-      if (itemError || !purchaseItem) {
+      if (
+        itemError ||
+        !purchaseItem
+      ) {
         throw new Error(
           itemError?.message ??
             "Não foi possível registrar o item da compra."
         );
       }
 
-      const { error: accessError } = await admin
+      /*
+       * Libera o produto para o usuário.
+       */
+      const {
+        error: accessError,
+      } = await admin
         .from("user_product_access")
         .upsert(
           {
             user_id: profile.id,
-            product_id: internalProduct.id,
+            product_id:
+              internalProduct.id,
             purchase_id: purchase.id,
-            purchase_item_id: purchaseItem.id,
+            purchase_item_id:
+              purchaseItem.id,
             status: "active",
             granted_at:
               new Date().toISOString(),
             revoked_at: null,
           },
           {
-            onConflict: "purchase_item_id",
+            onConflict:
+              "purchase_item_id",
           }
         );
 
       if (accessError) {
-        throw new Error(accessError.message);
+        throw new Error(
+          accessError.message
+        );
       }
 
       releasedProducts.push(
@@ -496,15 +678,24 @@ export async function POST(request: Request) {
       );
     }
 
+    /*
+     * Envia o e-mail de acesso.
+     * Caso o envio falhe, a compra continua
+     * processada e o acesso permanece liberado.
+     */
     let emailSent = false;
-    let emailErrorMessage: string | null = null;
+
+    let emailErrorMessage:
+      | string
+      | null = null;
 
     try {
       await sendAccessEmail({
         email: customerEmail,
         customerName:
           payload.customer?.name ?? null,
-        productNames: releasedProducts,
+        productNames:
+          releasedProducts,
       });
 
       emailSent = true;
@@ -524,8 +715,10 @@ export async function POST(request: Request) {
       .from("webhook_events")
       .update({
         status: "processed",
-        processed_at: new Date().toISOString(),
-        error_message: emailErrorMessage,
+        processed_at:
+          new Date().toISOString(),
+        error_message:
+          emailErrorMessage,
       })
       .eq("id", webhookEventId);
 
@@ -537,7 +730,8 @@ export async function POST(request: Request) {
       customerEmail,
       releasedProducts,
       emailSent,
-      emailError: emailErrorMessage,
+      emailError:
+        emailErrorMessage,
     });
   } catch (error) {
     const message =
@@ -567,7 +761,9 @@ export async function POST(request: Request) {
         details: message,
         eventId: webhookEventId,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
