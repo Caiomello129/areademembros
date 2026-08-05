@@ -1,24 +1,26 @@
-import { login } from "./actions";
+import { updatePassword } from "./actions";
 
-type LoginPageProps = {
+type DefinePasswordPageProps = {
   searchParams: Promise<{
     error?: string;
   }>;
 };
 
-export default async function LoginPage({
+export default async function DefinePasswordPage({
   searchParams,
-}: LoginPageProps) {
+}: DefinePasswordPageProps) {
   const { error } = await searchParams;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4 text-white">
-      <div className="w-full max-w-md rounded-3xl border border-neutral-800 bg-neutral-900 p-8 shadow-2xl">
+      <div className="w-full max-w-md rounded-3xl border border-neutral-800 bg-neutral-900 p-8">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold">Modus Members</h1>
+          <h1 className="text-3xl font-bold">
+            Crie sua senha
+          </h1>
 
           <p className="mt-2 text-sm text-neutral-400">
-            Entre para acessar seus produtos.
+            Defina a senha que será usada para acessar seus produtos.
           </p>
         </div>
 
@@ -28,42 +30,42 @@ export default async function LoginPage({
           </div>
         )}
 
-        <form action={login} className="space-y-5">
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-2 block text-sm font-medium text-neutral-300"
-            >
-              E-mail
-            </label>
-
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="seuemail@exemplo.com"
-              className="w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-3 outline-none transition focus:border-white"
-            />
-          </div>
-
+        <form action={updatePassword} className="space-y-5">
           <div>
             <label
               htmlFor="password"
               className="mb-2 block text-sm font-medium text-neutral-300"
             >
-              Senha
+              Nova senha
             </label>
 
             <input
               id="password"
               name="password"
               type="password"
+              minLength={8}
               required
-              autoComplete="current-password"
-              placeholder="Digite sua senha"
-              className="w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-3 outline-none transition focus:border-white"
+              autoComplete="new-password"
+              className="w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-3 outline-none focus:border-white"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="confirmPassword"
+              className="mb-2 block text-sm font-medium text-neutral-300"
+            >
+              Confirme a senha
+            </label>
+
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              minLength={8}
+              required
+              autoComplete="new-password"
+              className="w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-3 outline-none focus:border-white"
             />
           </div>
 
@@ -71,7 +73,7 @@ export default async function LoginPage({
             type="submit"
             className="w-full rounded-xl bg-white px-4 py-3 font-semibold text-black transition hover:bg-neutral-200"
           >
-            Entrar
+            Salvar senha e acessar
           </button>
         </form>
       </div>

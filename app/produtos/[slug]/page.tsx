@@ -23,30 +23,42 @@ export default async function ProductPage({
     redirect("/login");
   }
 
-  const { data: product } = await supabase
+  const { data: product, error: productError } = await supabase
     .from("products")
     .select("id, title, slug, description, thumbnail_url")
     .eq("slug", slug)
     .eq("status", "active")
     .single();
 
-  if (!product) {
+  if (productError || !product) {
     notFound();
   }
 
-  const { data: access } = await supabase
+  const { data: accesses, error: accessError } = await supabase
     .from("user_product_access")
     .select("id")
     .eq("user_id", user.id)
     .eq("product_id", product.id)
     .eq("status", "active")
-    .maybeSingle();
+    .limit(1);
 
-  if (!access) {
+  if (accessError) {
+    return (
+      <main className="min-h-screen bg-neutral-950 p-6 text-white">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-2xl border border-red-900 bg-red-950/40 p-6 text-red-300">
+            Erro ao verificar seu acesso: {accessError.message}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (!accesses || accesses.length === 0) {
     redirect("/dashboard");
   }
 
-  const { data: modules } = await supabase
+  const { data: modules, error: modulesError } = await supabase
     .from("product_modules")
     .select(`
       id,
@@ -68,6 +80,18 @@ export default async function ProductPage({
     .eq("status", "active")
     .order("position", { ascending: true });
 
+  if (modulesError) {
+    return (
+      <main className="min-h-screen bg-neutral-950 p-6 text-white">
+        <div className="mx-auto max-w-5xl">
+          <div className="rounded-2xl border border-red-900 bg-red-950/40 p-6 text-red-300">
+            Erro ao carregar os materiais: {modulesError.message}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-neutral-950 p-6 text-white">
       <div className="mx-auto max-w-5xl">
@@ -81,7 +105,9 @@ export default async function ProductPage({
         <header className="mt-6 rounded-3xl border border-neutral-800 bg-neutral-900 p-8">
           <p className="text-sm text-neutral-400">Produto liberado</p>
 
-          <h1 className="mt-2 text-3xl font-bold">{product.title}</h1>
+          <h1 className="mt-2 text-3xl font-bold">
+            {product.title}
+          </h1>
 
           {product.description && (
             <p className="mt-3 max-w-2xl text-neutral-400">
@@ -98,69 +124,86 @@ export default async function ProductPage({
               </p>
             </div>
           ) : (
-            modules.map((module) => (
-              <article
-                key={module.id}
-                className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6"
-              >
-                <h2 className="text-xl font-semibold">{module.title}</h2>
+            modules.map((module) => {
+              const contents = Array.isArray(module.product_contents)
+                ? [...module.product_contents].sort(
+                    (a, b) => a.position - b.position
+                  )
+                : [];
 
-                {module.description && (
-                  <p className="mt-2 text-sm text-neutral-400">
-                    {module.description}
-                  </p>
-                )}
+              return (
+                <article
+                  key={module.id}
+                  className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6"
+                >
+                  <h2 className="text-xl font-semibold">
+                    {module.title}
+                  </h2>
 
-                <div className="mt-5 space-y-3">
-                  {module.product_contents
-                    ?.sort((a, b) => a.position - b.position)
-                    .map((content) => (
-                      <div
-                        key={content.id}
-                        className="rounded-xl border border-neutral-800 bg-neutral-950 p-4"
-                      >
-                        <h3 className="font-medium">{content.title}</h3>
+                  {module.description && (
+                    <p className="mt-2 text-sm text-neutral-400">
+                      {module.description}
+                    </p>
+                  )}
 
-                        {content.description && (
-                          <p className="mt-1 text-sm text-neutral-400">
-                            {content.description}
-                          </p>
-                        )}
+                  <div className="mt-5 space-y-3">
+                    {contents.length === 0 ? (
+                      <p className="text-sm text-neutral-500">
+                        Nenhum conteúdo disponível neste módulo.
+                      </p>
+                    ) : (
+                      contents.map((content) => (
+                        <div
+                          key={content.id}
+                          className="rounded-xl border border-neutral-800 bg-neutral-950 p-4"
+                        >
+                          <h3 className="font-medium">
+                            {content.title}
+                          </h3>
 
-                        {content.content_type === "text" && content.body && (
-                          <div className="mt-4 whitespace-pre-line text-sm text-neutral-300">
-                            {content.body}
-                          </div>
-                        )}
-
-                        {(content.content_type === "pdf" ||
-                        content.content_type === "download") &&
-                        content.file_path && (
-                            <a
-                            href={`/api/download/${content.id}`}
-                            className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-neutral-200"
-                            >
-                            Baixar material
-                            </a>
-                        )}
-
-                        {(content.content_type === "link" ||
-                          content.content_type === "video") &&
-                          content.external_url && (
-                            <a
-                              href={content.external_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black"
-                            >
-                              Abrir conteúdo
-                            </a>
+                          {content.description && (
+                            <p className="mt-1 text-sm text-neutral-400">
+                              {content.description}
+                            </p>
                           )}
-                      </div>
-                    ))}
-                </div>
-              </article>
-            ))
+
+                          {content.content_type === "text" &&
+                            content.body && (
+                              <div className="mt-4 whitespace-pre-line text-sm text-neutral-300">
+                                {content.body}
+                              </div>
+                            )}
+
+                          {(content.content_type === "pdf" ||
+                            content.content_type === "download") &&
+                            content.file_path && (
+                              <a
+                                href={`/api/download/${content.id}`}
+                                className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-neutral-200"
+                              >
+                                Baixar material
+                              </a>
+                            )}
+
+                          {(content.content_type === "link" ||
+                            content.content_type === "video") &&
+                            content.external_url && (
+                              <a
+                                href={content.external_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black"
+                              >
+                                Abrir conteúdo
+                              </a>
+                            )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </article>
+              );
+            })
           )}
         </section>
       </div>
