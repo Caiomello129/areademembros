@@ -12,7 +12,12 @@ type GGCheckoutProduct = {
 
 type GGCheckoutPayload = {
   event?: string;
-  createdAt?: string;
+  createdAt?:
+    | string
+    | {
+        _seconds?: number;
+        _nanoseconds?: number;
+      };
 
   customer?: {
     name?: string;
@@ -101,6 +106,39 @@ function convertAmountToCents(amount?: number) {
   }
 
   return Math.round(amount * 100);
+}
+
+function normalizeCreatedAt(
+  createdAt?: GGCheckoutPayload["createdAt"]
+) {
+  if (!createdAt) {
+    return new Date().toISOString();
+  }
+
+  if (typeof createdAt === "string") {
+    const parsedDate = new Date(createdAt);
+
+    if (!Number.isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString();
+    }
+
+    return new Date().toISOString();
+  }
+
+  if (
+    typeof createdAt === "object" &&
+    typeof createdAt._seconds === "number"
+  ) {
+    const milliseconds =
+      createdAt._seconds * 1000 +
+      Math.floor(
+        (createdAt._nanoseconds ?? 0) / 1_000_000
+      );
+
+    return new Date(milliseconds).toISOString();
+  }
+
+  return new Date().toISOString();
 }
 
 export async function GET() {
@@ -528,9 +566,9 @@ export async function POST(request: Request) {
               payload.payment?.amount
             ),
           status: "paid",
-          paid_at:
-            payload.createdAt ??
-            new Date().toISOString(),
+          paid_at: normalizeCreatedAt(
+            payload.createdAt
+          ),
           raw_payload: payload,
         },
         {
