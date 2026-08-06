@@ -104,14 +104,24 @@ export default async function DashboardPage() {
       !ownedProductIds.has(product.id)
   );
 
-  const displayName =
-    profile?.full_name ||
+  const fullName =
+    profile?.full_name?.trim() ||
+    user.user_metadata?.full_name?.trim();
+
+  const accountEmail =
     profile?.email ||
     user.email ||
+    "";
+
+  const displayName =
+    fullName ||
+    accountEmail.split("@")[0] ||
     "Aluno";
 
   const firstName =
-    displayName.split(" ")[0] || "Aluno";
+    displayName.includes("@")
+      ? displayName.split("@")[0]
+      : displayName.split(" ")[0] || "Aluno";
 
   const continueProduct =
     ownedProducts[0] ?? null;
@@ -129,6 +139,7 @@ export default async function DashboardPage() {
                 size={14}
                 className="text-violet-300"
               />
+
               Sua área de aprendizado
             </div>
 
@@ -136,7 +147,7 @@ export default async function DashboardPage() {
               Bem-vindo de volta
             </p>
 
-            <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
+            <h1 className="mt-1 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
               Olá, {firstName} 👋
             </h1>
 
@@ -152,6 +163,7 @@ export default async function DashboardPage() {
                 className="mt-7 inline-flex items-center gap-3 rounded-2xl bg-white px-5 py-3.5 text-sm font-bold text-[#18131f] shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-100"
               >
                 Continuar estudando
+
                 <ArrowRight size={18} />
               </Link>
             ) : (
@@ -160,6 +172,7 @@ export default async function DashboardPage() {
                 className="mt-7 inline-flex items-center gap-3 rounded-2xl bg-white px-5 py-3.5 text-sm font-bold text-[#18131f] shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-100"
               >
                 Conhecer produtos
+
                 <ArrowRight size={18} />
               </a>
             )}
@@ -191,8 +204,7 @@ export default async function DashboardPage() {
 
           {accessError ? (
             <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-              Não foi possível carregar seus produtos:
-              {" "}
+              Não foi possível carregar seus produtos:{" "}
               {accessError.message}
             </div>
           ) : ownedProducts.length > 0 ? (

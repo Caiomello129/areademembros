@@ -5,13 +5,6 @@
   --foreground: #18181b;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -25,8 +18,7 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial,
-    Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 button,
@@ -57,4 +49,28 @@ img {
 ::-webkit-scrollbar-thumb:hover {
   background: #a8a5af;
   background-clip: padding-box;
+}
+
+.product-carousel {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x pan-y;
+  scroll-behavior: smooth;
+}
+
+.product-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .product-carousel {
+    cursor: grab;
+  }
+
+  .product-carousel:active {
+    cursor: grabbing;
+  }
 }
