@@ -10,14 +10,7 @@ import {
   ShoppingBag,
   UserRound,
 } from "lucide-react";
-import {
-  usePathname,
-  useRouter,
-} from "next/navigation";
-import {
-  useEffect,
-  useState,
-} from "react";
+import { usePathname } from "next/navigation";
 import { logout } from "@/app/login/actions";
 
 type MemberShellProps = {
@@ -46,19 +39,19 @@ const navigationItems: NavigationItem[] = [
   },
   {
     label: "Meus produtos",
-    href: "/dashboard#meus-produtos",
+    href: "/meus-produtos",
     icon: BookOpen,
     section: "produtos",
   },
   {
     label: "Loja",
-    href: "/dashboard#recomendacoes",
+    href: "/loja",
     icon: ShoppingBag,
     section: "loja",
   },
   {
     label: "Suporte",
-    href: "#",
+    href: "/suporte",
     icon: Headphones,
     section: "suporte",
   },
@@ -69,107 +62,37 @@ export function MemberShell({
   userName,
 }: MemberShellProps) {
   const pathname = usePathname();
-  const router = useRouter();
-
-  const [activeSection, setActiveSection] =
-    useState<
-      | "inicio"
-      | "produtos"
-      | "loja"
-      | "suporte"
-      | "perfil"
-    >("inicio");
-
-  useEffect(() => {
-    function updateActiveSection() {
-      const hash = window.location.hash;
-
-      if (pathname.startsWith("/produtos/")) {
-        setActiveSection("produtos");
-        return;
-      }
-
-      if (pathname === "/perfil") {
-        setActiveSection("perfil");
-        return;
-      }
-
-      if (
-        hash === "#meus-produtos"
-      ) {
-        setActiveSection("produtos");
-        return;
-      }
-
-      if (
-        hash === "#recomendacoes"
-      ) {
-        setActiveSection("loja");
-        return;
-      }
-
-      setActiveSection("inicio");
-    }
-
-    updateActiveSection();
-
-    window.addEventListener(
-      "hashchange",
-      updateActiveSection
-    );
-
-    return () => {
-      window.removeEventListener(
-        "hashchange",
-        updateActiveSection
-      );
-    };
-  }, [pathname]);
-
-  function handleNavigation(
-    item: NavigationItem
-  ) {
-    setActiveSection(item.section);
-
-    if (
-      item.section === "produtos" ||
-      item.section === "loja"
-    ) {
-      const elementId =
-        item.section === "produtos"
-          ? "meus-produtos"
-          : "recomendacoes";
-
-      if (pathname === "/dashboard") {
-        const element =
-          document.getElementById(
-            elementId
-          );
-
-        element?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-
-        window.history.replaceState(
-          null,
-          "",
-          `/dashboard#${elementId}`
-        );
-
-        return;
-      }
-
-      router.push(
-        `/dashboard#${elementId}`
-      );
-    }
-  }
 
   function isActive(
     section: NavigationItem["section"]
   ) {
-    return activeSection === section;
+    if (section === "inicio") {
+      return pathname === "/dashboard";
+    }
+
+    if (section === "produtos") {
+      return (
+        pathname === "/meus-produtos" ||
+        pathname.startsWith("/produtos/")
+      );
+    }
+
+    if (section === "loja") {
+      return (
+        pathname === "/loja" ||
+        pathname.startsWith("/loja/")
+      );
+    }
+
+    if (section === "suporte") {
+      return pathname === "/suporte";
+    }
+
+    if (section === "perfil") {
+      return pathname === "/perfil";
+    }
+
+    return false;
   }
 
   return (
@@ -177,9 +100,6 @@ export function MemberShell({
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[260px] flex-col border-r border-white/5 bg-[#100d19] px-5 py-6 text-white lg:flex">
         <Link
           href="/dashboard"
-          onClick={() =>
-            setActiveSection("inicio")
-          }
           className="flex items-center gap-3 px-3"
         >
           <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 text-lg font-black shadow-lg shadow-purple-950/40">
@@ -198,52 +118,40 @@ export function MemberShell({
         </Link>
 
         <nav className="mt-10 space-y-2">
-          {navigationItems.map(
-            (item) => {
-              const Icon = item.icon;
-              const active = isActive(
-                item.section
-              );
+          {navigationItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.section);
 
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={(event) => {
-                    if (
-                      item.section ===
-                        "produtos" ||
-                      item.section ===
-                        "loja"
-                    ) {
-                      event.preventDefault();
-                      handleNavigation(item);
-                    } else {
-                      setActiveSection(
-                        item.section
-                      );
-                    }
-                  }}
-                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                    active
-                      ? "bg-white/10 text-white"
-                      : "text-white/60 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  <Icon
-                    size={19}
-                    strokeWidth={1.8}
-                  />
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                  active
+                    ? "bg-white/10 text-white"
+                    : "text-white/60 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                <Icon
+                  size={19}
+                  strokeWidth={1.8}
+                />
 
-                  {item.label}
-                </Link>
-              );
-            }
-          )}
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="mt-auto">
-          <div className="mb-4 rounded-2xl border border-white/5 bg-white/[0.04] p-4">
+          <Link
+            href="/perfil"
+            className={`mb-4 block rounded-2xl border p-4 transition ${
+              isActive("perfil")
+                ? "border-violet-400/30 bg-violet-500/10"
+                : "border-white/5 bg-white/[0.04] hover:bg-white/[0.07]"
+            }`}
+          >
             <div className="flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-violet-300">
                 <UserRound size={19} />
@@ -259,7 +167,7 @@ export function MemberShell({
                 </p>
               </div>
             </div>
-          </div>
+          </Link>
 
           <form action={logout}>
             <button
@@ -286,29 +194,12 @@ export function MemberShell({
           .slice(0, 3)
           .map((item) => {
             const Icon = item.icon;
-            const active = isActive(
-              item.section
-            );
+            const active = isActive(item.section);
 
             return (
               <Link
                 key={item.label}
                 href={item.href}
-                onClick={(event) => {
-                  if (
-                    item.section ===
-                      "produtos" ||
-                    item.section ===
-                      "loja"
-                  ) {
-                    event.preventDefault();
-                    handleNavigation(item);
-                  } else {
-                    setActiveSection(
-                      item.section
-                    );
-                  }
-                }}
                 className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-center text-[10px] font-medium transition ${
                   active
                     ? "bg-white/10 text-white"
@@ -328,10 +219,7 @@ export function MemberShell({
           })}
 
         <Link
-          href="#"
-          onClick={() =>
-            setActiveSection("perfil")
-          }
+          href="/perfil"
           className={`flex flex-col items-center justify-center gap-1 rounded-2xl py-2 text-[10px] font-medium transition ${
             isActive("perfil")
               ? "bg-white/10 text-white"
