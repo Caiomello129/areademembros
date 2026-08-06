@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  BookOpen,
   Eye,
   EyeOff,
   Pencil,
@@ -186,6 +187,14 @@ export default async function AdminProductsPage() {
                     <EyeOff size={18} />
                   )}
                 </div>
+
+                <Link
+                  href={`/admin/produtos/${product.id}/conteudos`}
+                  className="flex size-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700 transition hover:bg-amber-100"
+                  title="Gerenciar conteúdos"
+                >
+                  <BookOpen size={18} />
+                </Link>
 
                 <Link
                   href={`/admin/produtos/${product.id}/editar`}
