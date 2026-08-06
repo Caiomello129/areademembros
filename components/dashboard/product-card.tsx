@@ -11,12 +11,34 @@ export type DashboardProduct = {
   slug: string;
   description: string | null;
   thumbnail_url: string | null;
+  store_price_cents?: number | null;
+  store_compare_price_cents?: number | null;
+  store_badge?: string | null;
+  store_button_text?: string | null;
+  store_link_type?: string | null;
+  store_url?: string | null;
 };
 
 type ProductCardProps = {
   product: DashboardProduct;
   owned: boolean;
 };
+
+function formatPrice(
+  priceInCents?: number | null
+) {
+  if (
+    priceInCents === null ||
+    priceInCents === undefined
+  ) {
+    return null;
+  }
+
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(priceInCents / 100);
+}
 
 export function ProductCard({
   product,
@@ -26,6 +48,14 @@ export function ProductCard({
     ? `/produtos/${product.slug}`
     : `/loja/${product.slug}`;
 
+  const currentPrice = formatPrice(
+    product.store_price_cents
+  );
+
+  const comparePrice = formatPrice(
+    product.store_compare_price_cents
+  );
+
   return (
     <article className="group w-[245px] shrink-0 sm:w-[270px] xl:w-[285px]">
       <Link
@@ -33,6 +63,12 @@ export function ProductCard({
         className="block overflow-hidden rounded-[26px] border border-black/[0.06] bg-white shadow-[0_12px_40px_rgba(24,24,27,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_55px_rgba(24,24,27,0.13)]"
       >
         <div className="relative aspect-[4/5] overflow-hidden bg-[#e9e7ef]">
+          {!owned && product.store_badge && (
+            <span className="absolute left-4 top-4 z-20 rounded-full bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-violet-700 shadow-lg">
+              {product.store_badge}
+            </span>
+          )}
+
           {product.thumbnail_url ? (
             <img
               src={product.thumbnail_url}
@@ -83,6 +119,20 @@ export function ProductCard({
               "Acesse todos os conteúdos e materiais disponíveis neste produto."}
           </p>
 
+          {!owned && currentPrice && (
+            <div className="mt-4 flex items-end gap-2">
+              <span className="text-xl font-black text-zinc-900">
+                {currentPrice}
+              </span>
+
+              {comparePrice && (
+                <span className="pb-0.5 text-sm text-zinc-400 line-through">
+                  {comparePrice}
+                </span>
+              )}
+            </div>
+          )}
+
           <div
             className={`mt-5 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-bold transition ${
               owned
@@ -93,7 +143,8 @@ export function ProductCard({
             <span>
               {owned
                 ? "Acessar produto"
-                : "Liberar produto"}
+                : product.store_button_text ||
+                  "Liberar produto"}
             </span>
 
             {owned ? (

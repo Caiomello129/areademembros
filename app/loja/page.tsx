@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
-import { ShoppingBag, Sparkles } from "lucide-react";
+import {
+  ShoppingBag,
+  Sparkles,
+} from "lucide-react";
 import { MemberShell } from "@/components/layout/member-shell";
 import {
   ProductCard,
@@ -57,7 +60,10 @@ export default async function LojaPage() {
 
         return access.products?.id;
       })
-      .filter((id): id is string => Boolean(id))
+      .filter(
+        (id): id is string =>
+          Boolean(id)
+      )
   );
 
   const {
@@ -70,9 +76,16 @@ export default async function LojaPage() {
       title,
       slug,
       description,
-      thumbnail_url
+      thumbnail_url,
+      store_price_cents,
+      store_compare_price_cents,
+      store_badge,
+      store_button_text,
+      store_link_type,
+      store_url
     `)
     .eq("status", "active")
+    .eq("store_enabled", true)
     .order("position", {
       ascending: true,
     });
@@ -99,6 +112,7 @@ export default async function LojaPage() {
                 size={14}
                 className="text-violet-300"
               />
+
               Conteúdos selecionados
             </div>
 
@@ -128,7 +142,11 @@ export default async function LojaPage() {
 
             <div className="hidden items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm text-zinc-500 sm:flex">
               <ShoppingBag size={16} />
-              {products.length} produtos
+
+              {products.length}{" "}
+              {products.length === 1
+                ? "produto"
+                : "produtos"}
             </div>
           </div>
 
@@ -159,7 +177,9 @@ export default async function LojaPage() {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  owned={ownedProductIds.has(product.id)}
+                  owned={ownedProductIds.has(
+                    product.id
+                  )}
                 />
               ))}
             </div>
